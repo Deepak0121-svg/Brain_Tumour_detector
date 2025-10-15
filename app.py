@@ -7,10 +7,10 @@ import os
 # ---------------------------
 # ENVIRONMENT SETTINGS
 # ---------------------------
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # hide TF warnings
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # force CPU
 
-# Limit CPU threads
+# Limit TensorFlow threads to reduce memory usage
 tf.config.threading.set_intra_op_parallelism_threads(1)
 tf.config.threading.set_inter_op_parallelism_threads(1)
 
@@ -20,11 +20,11 @@ tf.config.threading.set_inter_op_parallelism_threads(1)
 app = Flask(__name__)
 
 # ---------------------------
-# LOAD MODEL
+# LOAD XCEPTION MODEL
 # ---------------------------
 MODEL_PATH = "./Brain_tumor_XceptionModel.h5"
 try:
-    model = tf.keras.models.load_model(MODEL_PATH, compile=False)  # compile=False saves memory
+    model = tf.keras.models.load_model(MODEL_PATH, compile=False)  # compile=False reduces RAM usage
     print("Model loaded successfully.")
 except Exception as e:
     print(f"Error loading model: {e}")
@@ -46,30 +46,33 @@ def home():
 def predict():
     if 'file' not in request.files:
         return redirect(url_for('home'))
+
     file = request.files['file']
     if file.filename == '':
         return redirect(url_for('home'))
-    if file:
-        try:
-            os.makedirs("static/uploads", exist_ok=True)
-            file_path = os.path.join("static/uploads", file.filename)
-            file.save(file_path)
 
-            img = image.load_img(file_path, target_size=IMG_SIZE)
-            img_array = image.img_to_array(img)
-            img_array = np.expand_dims(img_array, axis=0) / 255.0
+    try:
+        os.makedirs("static/uploads", exist_ok=True)
+        file_path = os.path.join("static/uploads", file.filename)
+        file.save(file_path)
 
-            preds = model.predict(img_array)
-            pred_class = np.argmax(preds, axis=1)[0]
-            pred_label = class_labels[pred_class]
-            confidence = float(np.max(preds)) * 100
+        # Preprocess image
+        img = image.load_img(file_path, target_size=IMG_SIZE)
+        img_array = image.img_to_array(img)
+        img_array = np.expand_dims(img_array, axis=0) / 255.0
 
-            return render_template("result.html",
-                                   file_path=file_path,
-                                   prediction=pred_label,
-                                   confidence=round(confidence, 2))
-        except Exception as e:
-            return f"Error during prediction: {e}"
+        # Predict
+        preds = model.predict(img_array)
+        pred_class = np.argmax(preds, axis=1)[0]
+        pred_label = class_labels[pred_class]
+        confidence = float(np.max(preds)) * 100
+
+        return render_template("result.html",
+                               file_path=file_path,
+                               prediction=pred_label,
+                               confidence=round(confidence, 2))
+    except Exception as e:
+        return f"Error during prediction: {e}"
 
 # ---------------------------
 # RUN APP
