@@ -1,65 +1,52 @@
-from flask import Flask, render_template, request, redirect, url_for
+import streamlit as st
 import tensorflow as tf
-from tensorflow.keras.preprocessing import image
+from PIL import Image
 import numpy as np
 import os
 
 # ---------------------------
 # ENVIRONMENT SETTINGS
 # ---------------------------
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # hide TF warnings
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # force CPU
-
-# Limit TensorFlow threads to reduce memory usage
-tf.config.threading.set_intra_op_parallelism_threads(1)
-tf.config.threading.set_inter_op_parallelism_threads(1)
+# Hide TensorFlow warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+# Force CPU (if using Render or local CPU)
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 # ---------------------------
-# INITIALIZE FLASK APP
+# LOAD MODEL
 # ---------------------------
-app = Flask(__name__)
-
-# ---------------------------
-# LOAD XCEPTION MODEL
-# ---------------------------
-MODEL_PATH = "./Brain_tumor_XceptionModel.h5"
+MODEL_PATH = "./Brain_tumor_XceptionModel.h5"  # Update this if your path is different
 try:
-    model = tf.keras.models.load_model(MODEL_PATH, compile=False)  # compile=False reduces RAM usage
-    print("Model loaded successfully.")
+    model = tf.keras.models.load_model(MODEL_PATH)
+    st.success("Model loaded successfully!")
 except Exception as e:
-    print(f"Error loading model: {e}")
+    st.error(f"Error loading model: {e}")
 
 # ---------------------------
 # IMAGE SIZE AND CLASS LABELS
 # ---------------------------
-IMG_SIZE = (224, 224)
-class_labels = ['glioma', 'meningioma', 'notumor', 'pituitary']
+IMG_SIZE = (224, 224)  # Must match your model's input size
+class_labels = ['glioma', 'meningioma', 'notumor', 'pituitary']  # Update if needed
 
 # ---------------------------
-# ROUTES
+# STREAMLIT APP LAYOUT
 # ---------------------------
-@app.route('/')
-def home():
-    return render_template('index.html')
+st.set_page_config(page_title="Brain Tumor Detector", layout="centered")
+st.title("🧠 Brain Tumor Classification")
+st.write("Upload an MRI image and get predictions from the Xception model.")
 
-@app.route('/predict', methods=['POST'])
-def predict():
-    if 'file' not in request.files:
-        return redirect(url_for('home'))
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
-    file = request.files['file']
-    if file.filename == '':
-        return redirect(url_for('home'))
-
+if uploaded_file is not None:
     try:
-        os.makedirs("static/uploads", exist_ok=True)
-        file_path = os.path.join("static/uploads", file.filename)
-        file.save(file_path)
+        # Load image and convert to RGB
+        img = Image.open(uploaded_file).convert('RGB')
+        st.image(img, caption='Uploaded Image', use_column_width=True)
 
         # Preprocess image
-        img = image.load_img(file_path, target_size=IMG_SIZE)
-        img_array = image.img_to_array(img)
-        img_array = np.expand_dims(img_array, axis=0) / 255.0
+        img = img.resize(IMG_SIZE)
+        img_array = np.array(img)
+        img_array = np.expand_dims(img_array, axis=0) / 255.0  # Normalize
 
         # Predict
         preds = model.predict(img_array)
@@ -67,16 +54,9 @@ def predict():
         pred_label = class_labels[pred_class]
         confidence = float(np.max(preds)) * 100
 
-        return render_template("result.html",
-                               file_path=file_path,
-                               prediction=pred_label,
-                               confidence=round(confidence, 2))
-    except Exception as e:
-        return f"Error during prediction: {e}"
+        # Display results
+        st.success(f"Prediction: {pred_label}")
+        st.info(f"Confidence: {round(confidence, 2)}%")
 
-# ---------------------------
-# RUN APP
-# ---------------------------
-if __name__ == "__main__":
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    except Exception as e:
+        st.error(f"Error during prediction: {e}")
