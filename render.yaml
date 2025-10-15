@@ -1,6 +1,10 @@
 services:
   - type: web
-    name: brain-tumor-detector
+    name: brain-tumor-app
     env: python
-    buildCommand: pip install -r requirements.txt
+    plan: free
+    buildCommand: bash build.sh
     startCommand: gunicorn app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.13
