@@ -4,25 +4,43 @@ from tensorflow.keras.preprocessing import image
 import numpy as np
 import os
 
-# Initialize Flask app
+# ---------------------------
+# ENVIRONMENT SETTINGS
+# ---------------------------
+# Hide TensorFlow warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+# Force CPU (Render does not have GPU)
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
+# ---------------------------
+# INITIALIZE FLASK APP
+# ---------------------------
 app = Flask(__name__)
 
-# Load the SavedModel folder (replace with your folder path)
-MODEL_PATH = "./Brain_tumor_XceptionModel.h5"  # path to the folder
-model = tf.keras.models.load_model(MODEL_PATH)
+# ---------------------------
+# LOAD MODEL
+# ---------------------------
+MODEL_PATH = "./Brain_tumor_XceptionModel.h5"  # Update if your model path is different
+try:
+    model = tf.keras.models.load_model(MODEL_PATH)
+    print("Model loaded successfully.")
+except Exception as e:
+    print(f"Error loading model: {e}")
 
-# Define image size (must match training)
-IMG_SIZE = (224, 224)
+# ---------------------------
+# IMAGE SIZE AND CLASS LABELS
+# ---------------------------
+IMG_SIZE = (224, 224)  # Must match training
+class_labels = ['glioma', 'meningioma', 'notumor', 'pituitary']  # Update according to your classes
 
-# Define class labels (update according to your training classes)
-class_labels = ['glioma', 'meningioma', 'notumor', 'pituitary']
-
-# Home route
+# ---------------------------
+# ROUTES
+# ---------------------------
 @app.route('/')
 def home():
     return render_template('index.html')
 
-# Prediction route
+
 @app.route('/predict', methods=['POST'])
 def predict():
     if 'file' not in request.files:
@@ -33,27 +51,33 @@ def predict():
         return redirect(url_for('home'))
 
     if file:
-        # Save uploaded file
-        file_path = os.path.join("static", file.filename)
-        os.makedirs("static", exist_ok=True)
-        file.save(file_path)
+        try:
+            # Save uploaded file
+            os.makedirs("static/uploads", exist_ok=True)
+            file_path = os.path.join("static/uploads", file.filename)
+            file.save(file_path)
 
-        # Preprocess image
-        img = image.load_img(file_path, target_size=IMG_SIZE)
-        img_array = image.img_to_array(img)
-        img_array = np.expand_dims(img_array, axis=0) / 255.0  # normalize
+            # Preprocess image
+            img = image.load_img(file_path, target_size=IMG_SIZE)
+            img_array = image.img_to_array(img)
+            img_array = np.expand_dims(img_array, axis=0) / 255.0  # normalize
 
-        # Predict
-        preds = model.predict(img_array)
-        pred_class = np.argmax(preds, axis=1)[0]
-        pred_label = class_labels[pred_class]
-        confidence = float(np.max(preds)) * 100
+            # Predict
+            preds = model.predict(img_array)
+            pred_class = np.argmax(preds, axis=1)[0]
+            pred_label = class_labels[pred_class]
+            confidence = float(np.max(preds)) * 100
 
-        return render_template("result.html",
-                               file_path=file_path,
-                               prediction=pred_label,
-                               confidence=round(confidence, 2))
+            return render_template("result.html",
+                                   file_path=file_path,
+                                   prediction=pred_label,
+                                   confidence=round(confidence, 2))
+        except Exception as e:
+            return f"Error during prediction: {e}"
 
-# Run app
+# ---------------------------
+# RUN APP
+# ---------------------------
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Use 0.0.0.0 for Render to bind properly
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)
