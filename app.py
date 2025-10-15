@@ -9,7 +9,7 @@ import os
 # ---------------------------
 # Hide TensorFlow warnings
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-# Force CPU (Render does not have GPU)
+# Force CPU (Render does not provide GPU)
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 # ---------------------------
@@ -20,7 +20,7 @@ app = Flask(__name__)
 # ---------------------------
 # LOAD MODEL
 # ---------------------------
-MODEL_PATH = "./Brain_tumor_XceptionModel.h5"  # Update if your model path is different
+MODEL_PATH = "./Brain_tumor_XceptionModel.h5"  # Ensure this path matches your project
 try:
     model = tf.keras.models.load_model(MODEL_PATH)
     print("Model loaded successfully.")
@@ -30,8 +30,8 @@ except Exception as e:
 # ---------------------------
 # IMAGE SIZE AND CLASS LABELS
 # ---------------------------
-IMG_SIZE = (224, 224)  # Must match training
-class_labels = ['glioma', 'meningioma', 'notumor', 'pituitary']  # Update according to your classes
+IMG_SIZE = (224, 224)  # Must match training size
+class_labels = ['glioma', 'meningioma', 'notumor', 'pituitary']  # Update if needed
 
 # ---------------------------
 # ROUTES
@@ -52,7 +52,7 @@ def predict():
 
     if file:
         try:
-            # Save uploaded file
+            # Save uploaded file safely
             os.makedirs("static/uploads", exist_ok=True)
             file_path = os.path.join("static/uploads", file.filename)
             file.save(file_path)
@@ -79,5 +79,6 @@ def predict():
 # RUN APP
 # ---------------------------
 if __name__ == "__main__":
-    # Use 0.0.0.0 for Render to bind properly
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)
+    # Bind to Render's PORT
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
