@@ -7,8 +7,12 @@ import os
 # ---------------------------
 # ENVIRONMENT SETTINGS
 # ---------------------------
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'       # Hide TF warnings
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'     # Force CPU
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
+# Limit CPU threads
+tf.config.threading.set_intra_op_parallelism_threads(1)
+tf.config.threading.set_inter_op_parallelism_threads(1)
 
 # ---------------------------
 # INITIALIZE FLASK APP
@@ -20,7 +24,7 @@ app = Flask(__name__)
 # ---------------------------
 MODEL_PATH = "./Brain_tumor_XceptionModel.h5"
 try:
-    model = tf.keras.models.load_model(MODEL_PATH)
+    model = tf.keras.models.load_model(MODEL_PATH, compile=False)  # compile=False saves memory
     print("Model loaded successfully.")
 except Exception as e:
     print(f"Error loading model: {e}")
@@ -42,24 +46,19 @@ def home():
 def predict():
     if 'file' not in request.files:
         return redirect(url_for('home'))
-
     file = request.files['file']
     if file.filename == '':
         return redirect(url_for('home'))
-
     if file:
         try:
-            # Save uploaded file
             os.makedirs("static/uploads", exist_ok=True)
             file_path = os.path.join("static/uploads", file.filename)
             file.save(file_path)
 
-            # Preprocess image
             img = image.load_img(file_path, target_size=IMG_SIZE)
             img_array = image.img_to_array(img)
             img_array = np.expand_dims(img_array, axis=0) / 255.0
 
-            # Predict
             preds = model.predict(img_array)
             pred_class = np.argmax(preds, axis=1)[0]
             pred_label = class_labels[pred_class]
