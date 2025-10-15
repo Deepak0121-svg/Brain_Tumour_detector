@@ -7,10 +7,8 @@ import os
 # ---------------------------
 # ENVIRONMENT SETTINGS
 # ---------------------------
-# Hide TensorFlow warnings
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-# Force CPU (Render does not provide GPU)
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'       # Hide TF warnings
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'     # Force CPU
 
 # ---------------------------
 # INITIALIZE FLASK APP
@@ -20,7 +18,7 @@ app = Flask(__name__)
 # ---------------------------
 # LOAD MODEL
 # ---------------------------
-MODEL_PATH = "./Brain_tumor_XceptionModel.h5"  # Ensure this path matches your project
+MODEL_PATH = "./Brain_tumor_XceptionModel.h5"
 try:
     model = tf.keras.models.load_model(MODEL_PATH)
     print("Model loaded successfully.")
@@ -30,8 +28,8 @@ except Exception as e:
 # ---------------------------
 # IMAGE SIZE AND CLASS LABELS
 # ---------------------------
-IMG_SIZE = (224, 224)  # Must match training size
-class_labels = ['glioma', 'meningioma', 'notumor', 'pituitary']  # Update if needed
+IMG_SIZE = (224, 224)
+class_labels = ['glioma', 'meningioma', 'notumor', 'pituitary']
 
 # ---------------------------
 # ROUTES
@@ -39,7 +37,6 @@ class_labels = ['glioma', 'meningioma', 'notumor', 'pituitary']  # Update if nee
 @app.route('/')
 def home():
     return render_template('index.html')
-
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -52,7 +49,7 @@ def predict():
 
     if file:
         try:
-            # Save uploaded file safely
+            # Save uploaded file
             os.makedirs("static/uploads", exist_ok=True)
             file_path = os.path.join("static/uploads", file.filename)
             file.save(file_path)
@@ -60,7 +57,7 @@ def predict():
             # Preprocess image
             img = image.load_img(file_path, target_size=IMG_SIZE)
             img_array = image.img_to_array(img)
-            img_array = np.expand_dims(img_array, axis=0) / 255.0  # normalize
+            img_array = np.expand_dims(img_array, axis=0) / 255.0
 
             # Predict
             preds = model.predict(img_array)
@@ -79,6 +76,5 @@ def predict():
 # RUN APP
 # ---------------------------
 if __name__ == "__main__":
-    # Bind to Render's PORT
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
